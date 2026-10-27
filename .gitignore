@@ -1,0 +1,29 @@
+# Credentials: never commit
+.env
+.env.*
+!.env.example
+
+# The prompt sets are rebuilt from their upstream sources (data/build_data.py), never committed
+data/eval/
+data/train_policy.jsonl
+data/upstream/
+
+# Run outputs
+results/
+
+# Environments and tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.claude/settings.local.json
+.DS_Store
+*.swp
+
+# A stray autosaved notebook at the root must never be committed; the notebook lives in notebooks/
+/*.ipynb
+
+# Binaries, except the guide
+*.pdf
+!docs/GUIDE.pdf

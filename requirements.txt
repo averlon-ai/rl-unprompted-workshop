@@ -1,0 +1,6 @@
+openai>=1.40
+ipykernel<7 ; python_version < "3.11"    # 7.x on 3.10 logs "Task was destroyed but it is pending" in cell output
+ipykernel ; python_version >= "3.11"
+matplotlib
+plotly
+ipywidgets
