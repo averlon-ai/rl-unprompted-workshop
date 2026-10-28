@@ -235,7 +235,7 @@ def response_cards(rows, show_prompt=True, limit=1600, side_by_side=False):
 def milestone_cards(checkpoints, reference=None, order=("base", "m1", "m2", "m3", "mc")):
     """One card per checkpoint: its served name and training round, what it is, and its expected macro F1 with the
     per-class F1s underneath (from reference(), i.e. the frozen held-out numbers in checkpoints.json). mc is the live
-    run, so it shows 'live' with no number. The run below measures each one again on the slice you generate."""
+    run, so it shows 'live' with no number. These are full held-out numbers; the notebook's curated slice is not comparable to them."""
     ref = reference or {}
     items = []
     for name in order:

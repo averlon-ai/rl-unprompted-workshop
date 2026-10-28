@@ -75,7 +75,7 @@ def run_generate(client, models, per_class=50, seed=0, workers=16, max_tokens=20
     out = os.path.join(out_root, datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
     save_rows(rows, out)
     json.dump({"stage": "generate", "endpoint": A.BASE_URL, "models": [A.model_id(m) for m in models],
-               "per_class": per_class, "seed": seed, "max_tokens": max_tokens, "n_rows": len(rows),
+               "per_class": per_class, "sample": "all" if per_class is None else "random", "seed": seed, "max_tokens": max_tokens, "n_rows": len(rows),
                "seconds": round(time.time() - t0, 1)}, open(os.path.join(out, "generate.json"), "w"), indent=1)
     bad = sum(1 for r in rows if "response" not in r)
     print(f"saved {len(rows)} responses -> {out}/responses.jsonl" + (f"  ({bad} failed; see 'error')" if bad else ""))
