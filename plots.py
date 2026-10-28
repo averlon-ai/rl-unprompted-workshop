@@ -8,9 +8,8 @@ report.md / metrics.json, so no value is reachable only by colour):
   trend.png   macro F1 across the runs under results/, when there are at least two
 make_plots() writes them; report_section() is the markdown that embeds them.
 
-Interactive twins for the notebook (plotly, hover and zoom): plotly_reference (the milestones' own curve),
-plotly_arc, plotly_f1, plotly_labels, plotly_heatmap (prompt x checkpoint label map), plotly_trend; and
-scorecard_html, a compact HTML table of this run's precision, recall and F1 per checkpoint.
+For the notebook: scorecard_html, a compact HTML table of this run's precision, recall and F1 per checkpoint next to
+the expected numbers, and plotly_f1 (hover and zoom).
 
 Palette: one accent (the brand violet) against a de-emphasis grey, and a single-hue ordinal ramp for the label
 mix - forms whose separation rests on lightness, with a legend and selective direct labels, so they stay readable
@@ -45,12 +44,6 @@ def _models(metrics):
 
 
 model_order = _models                       # the public name: checkpoints in training order
-
-
-def _noise(rate, n):
-    """Half-width, in points, of the sampling-noise band on a rate measured on n prompts."""
-    p = (rate or 0) / 100.0
-    return 100 * math.sqrt(p * (1 - p) / n) if n else 0.0
 
 
 def _style(ax, ylabel=None, ylim=(0, 100)):
@@ -252,45 +245,6 @@ def _m(d, key):
     return d.get(key, d.get(key.replace("comply_", "unblock_"))) if d else None
 
 
-def plotly_pr(metrics, ref=None):
-    """Precision and recall per checkpoint, for each class: comply (should answer) vs refuse (should refuse)."""
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    models = _models(metrics)
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("precision", "recall"))
-    for col, (ukey, bkey) in enumerate((("comply_P", "refuse_P"), ("comply_R", "refuse_R")), start=1):
-        fig.add_bar(x=models, y=[_m(metrics[m], ukey) for m in models], name="comply", marker_color=ACCENT,
-                    showlegend=(col == 1), row=1, col=col, hovertemplate="%{x} comply: %{y:.1f}<extra></extra>")
-        fig.add_bar(x=models, y=[_m(metrics[m], bkey) for m in models], name="refuse", marker_color=ACCENT_MID,
-                    showlegend=(col == 1), row=1, col=col, hovertemplate="%{x} refuse: %{y:.1f}<extra></extra>")
-    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.06, height=380, **_PLOTLY_LAYOUT)
-    fig.update_yaxes(range=[0, 100], gridcolor=GRID)
-    return _titles(fig)
-
-
-def plotly_labels(rows):
-    import plotly.graph_objects as go
-    models = _models({r["model"]: 1 for r in rows})
-    names, data = [], {key: [] for key, _, _ in LABELS}
-    for m in models:
-        for target, tname in (("answer", "should answer"), ("refuse", "should refuse")):
-            rs = [r for r in rows if r["model"] == m and r["target"] == target and r.get("label")]
-            if not rs:
-                continue
-            names.append(f"{m} · {tname}")
-            for key, _, _ in LABELS:
-                data[key].append(100.0 * sum(1 for r in rs if r["label"] == key) / len(rs))
-    fig = go.Figure()
-    for key, lname, color in LABELS:
-        fig.add_bar(y=names, x=data[key], name=lname, orientation="h", marker_color=color,
-                    hovertemplate="%{y}<br>" + lname + ": %{x:.0f}%<extra></extra>")
-    layout = dict(_PLOTLY_LAYOUT, margin=dict(l=190, r=30, t=50, b=50), legend=dict(_PLOTLY_LAYOUT["legend"], traceorder="normal"))
-    fig.update_layout(barmode="stack", bargap=0.35, height=120 + 48 * len(names),
-                      xaxis=dict(range=[0, 100], title="share of judged responses, %", gridcolor=GRID),
-                      yaxis=dict(autorange="reversed", tickfont=dict(family=MONO, size=12)), **layout)
-    return fig
-
-
 FONT = "Inter, Arial, sans-serif"
 MONO = "JetBrains Mono, Courier New, monospace"
 _PLOTLY_LAYOUT = dict(plot_bgcolor=SURFACE, paper_bgcolor="#FFFFFF", font=dict(color=INK, size=13, family=FONT),
@@ -335,57 +289,6 @@ def plotly_f1(metrics, ref):
     fig.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08, height=360, **_PLOTLY_LAYOUT)
     fig.update_yaxes(range=[0, 100], gridcolor=GRID)
     return _titles(fig)
-
-
-def plotly_heatmap(rows):
-    """Prompt-by-checkpoint label map: which prompts each milestone answered (light), soft-refused (mid) or refused
-    (dark), one strip per target. Hover gives the prompt id, the label and the judge's reason."""
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    code = {"full_compliance": 0, "partial_refusal": 1, "full_refusal": 2}
-    models = _models({r["model"]: 1 for r in rows})
-    scale = [[0, ACCENT_PALE], [1 / 3, ACCENT_PALE], [1 / 3, ACCENT_MID], [2 / 3, ACCENT_MID], [2 / 3, ACCENT], [1, ACCENT]]
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=False, vertical_spacing=0.3,
-                        subplot_titles=("comply requests: any refusal is an over-refusal",
-                                        "refuse requests: an answer is a leak"))
-    def short(i):                                   # tick label: the id's tail, e.g. "cysecbench 11428", "frr-292"
-        tail = i.rsplit(":", 1)[-1]
-        return f"{tail.split('/')[0][:10]} {tail.rsplit('/', 1)[-1]}" if "/" in tail else tail[-16:]
-    for r_i, target in enumerate(("answer", "refuse"), start=1):
-        ids = sorted({str(r["id"]) for r in rows if r["target"] == target})
-        by = {(r["model"], str(r["id"])): r for r in rows if r["target"] == target}
-        z, txt = [], []
-        for m in models:
-            z.append([code.get(by.get((m, i), {}).get("label")) for i in ids])
-            txt.append([f"{i} · {m}<br>{by.get((m, i), {}).get('label', 'no label')}<br>{(by.get((m, i), {}).get('reason') or '')[:90]}" for i in ids])
-        fig.add_heatmap(z=z, x=ids, y=models, text=txt, hovertemplate="%{text}<extra></extra>", colorscale=scale,
-                        zmin=0, zmax=2, showscale=False, xgap=2, ygap=2, row=r_i, col=1)
-        fig.update_xaxes(showticklabels=len(ids) <= 40, tickangle=45, tickmode="array", tickvals=ids, ticktext=[short(i) for i in ids],
-                         tickfont=dict(family=MONO, size=10), row=r_i, col=1)
-    for key, lname, color in LABELS:                       # legend via three dummy markers
-        fig.add_scatter(x=[None], y=[None], mode="markers", marker=dict(size=12, color=color, symbol="square"),
-                        name=lname, showlegend=True)
-    fig.update_layout(height=260 + 34 * len(models) * 2, **_PLOTLY_LAYOUT)
-    fig.update_yaxes(tickfont=dict(family=MONO, size=12))
-    return _titles(fig)
-
-
-def plotly_trend(results_root):
-    """Macro F1 across the runs under results/, one line per checkpoint (None with fewer than two)."""
-    import plotly.graph_objects as go
-    runs = _load_runs(results_root)
-    if len(runs) < 2:
-        return None
-    models = _models({m: 1 for _, mm in runs for m in mm})
-    ramp = MODEL_RAMP
-    fig = go.Figure()
-    for m in models:
-        fig.add_scatter(x=[t for t, _ in runs], y=[mm.get(m, {}).get("macro_F1") for _, mm in runs], mode="lines+markers",
-                        name=m, line=dict(color=ramp.get(m, CONTEXT), width=2, dash="dash" if m == "mc" else "solid"),
-                        marker=dict(size=8), hovertemplate=m + ": macro F1 %{y:.1f}<br>%{x}<extra></extra>")
-    fig.update_layout(height=360, **_PLOTLY_LAYOUT)
-    fig.update_yaxes(range=[0, 100], gridcolor=GRID, title="macro F1")
-    return fig
 
 
 def scorecard_html(metrics, ref):

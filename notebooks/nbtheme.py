@@ -97,11 +97,13 @@ CSS = f"""
 .avn .scroller::-webkit-scrollbar-thumb{{background:#cbb8ea;border-radius:6px}}
 .avn .scroller > .resp{{flex:0 0 340px;width:340px;margin:0;scroll-snap-align:start}}
 .avn .scroller > .resp .text{{max-height:220px}}
+.avn .scroller.wide > .resp{{flex:0 0 460px;width:460px}}
+.avn .scroller.wide > .resp .text{{max-height:260px}}
 .avn .resp .milestone{{font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;font-weight:600;color:{ACC}}}
 """
 
 LABEL_PILL = {"full_compliance": ("answered", "ok"), "partial_refusal": ("soft refusal", "warn"), "full_refusal": ("refused", "bad"),
-              "answered": ("answered", "ok"), "hedged": ("hedged", "warn"), "refused": ("refused", "bad")}
+              "answered": ("looks answered", "ok"), "hedged": ("looks like a soft refusal", "warn"), "refused": ("looks refused", "bad")}
 
 
 def esc(s):
@@ -300,9 +302,10 @@ def connectivity(client, A, models, max_tokens=24):
     return ok_all
 
 
-def run_summary(mid, rows, A, samples=0):
-    """After one checkpoint's generate stage: the counts as cards. The hand-picked requests are shown across all the
-    checkpoints together in the gallery (section 3e), so no per-checkpoint samples here unless samples > 0."""
+def run_summary(mid, rows, A, samples=0, showcase=None):
+    """After one checkpoint's generate stage: the counts as cards, then this checkpoint's reply to every request in
+    the slice (peek_cards; the showcase ones marked) -- the same requests in every run cell, so the change shows cell
+    by cell, before the judge. With showcase=None, `samples` comply replies are shown instead."""
     ok = [r for r in rows if "response" in r]
     err = len(rows) - len(ok)
     finish = {}
@@ -317,11 +320,52 @@ def run_summary(mid, rows, A, samples=0):
     cards([{"k": "responses", "v": f"{len(ok)}<small> of {len(rows)}</small>", "c": (f"{err} failed" if err else "none failed")},
            {"k": "finish", "v": f"{finish.get('stop', 0)}<small> stop</small>", "c": ", ".join(f"{k}: {v}" for k, v in finish.items() if k != "stop") or "all complete"},
            {"k": "mean length", "v": f"{mean_len:,}<small> chars</small>", "c": "of the responses"},
-           {"k": "quick read, comply", "v": f"{100 * quick.get('answered', 0) // n_ans}%<small> complied</small>",
+           {"k": "quick read, comply", "v": f"{100 * quick.get('answered', 0) // n_ans}%<small> look answered</small>",
             "c": "visible heuristic only: the judge decides in 3c", "hi": True}])
-    picks = [r for r in ok if r["target"] == "answer"][:samples]
-    if samples and picks:
+    if showcase and peek_cards(mid, rows, showcase, A):
+        return
+    picks = [r for r in ok if r["target"] == "answer"][:(samples or 2)]
+    if picks:
         response_cards([dict(r, model=A.short(mid), label=None) for r in picks], show_prompt=True, limit=700, side_by_side=True)
+
+
+def peek_cards(mid, rows, showcase, A, limit=900):
+    """Right after one checkpoint generates: its reply to every request in the slice, in a sideways scroller -- comply
+    requests first, the showcase ones marked -- so every run cell shows the same requests and the change is visible
+    cell by cell before anything is judged. Both classes show the request. Comply requests also show the
+    full reply with the quick-read pill; refuse requests do not show the reply here -- it is judged in 3c and the
+    gallery (3e) shows it once a checkpoint fully refuses, because a non-refusal reply to a refuse request may contain
+    harmful model output. Returns True if anything was shown."""
+    show = {d["id"]: d for d in showcase or []}
+    ok = sorted((r for r in rows if "response" in r), key=lambda r: (r["target"] != "answer", r["id"] not in show))
+    cards_html, n = "", {"answer": 0, "refuse": 0}
+    for r in ok:
+        is_comply = r["target"] == "answer"
+        n[r["target"]] += 1
+        d = show.get(r["id"])
+        quick = A.classify(r["response"])
+        pills = (pill("comply", "acc") if is_comply else pill("refuse", "mute")) + (" " + pill("showcase", "mute") if d else "") + " " + label_pill(quick)
+        if r.get("finish") and r.get("finish") != "stop":
+            pills += " " + pill("finish: " + str(r["finish"]), "warn")
+        label = f'{A.short(mid)} · {"comply" if is_comply else "refuse"} {n[r["target"]]}'
+        head = f'<div class="head"><span class="milestone">{esc(label)}</span><span>{pills}</span></div>'
+        if is_comply:
+            req = " ".join(r["prompt"].split())
+            body = (f'<div class="prompt"><b>request</b> &nbsp;{esc(req[:300])}{" […]" if len(req) > 300 else ""}</div>'
+                    f'<div class="text">{render_text(r["response"], limit)}</div>')
+        else:
+            req = " ".join(r["prompt"].split())
+            body = (f'<div class="prompt"><b>request</b> &nbsp;{esc(req[:300])}{" […]" if len(req) > 300 else ""}</div>'
+                    f'<div class="small">the reply is judged in 3c and shown in the gallery (3e) once a checkpoint fully '
+                    f'refuses — {len(r["response"]):,} chars, quick read: <b>{esc(LABEL_PILL[quick][0])}</b>.</div>')
+        cards_html += f'<div class="resp">{head}{body}</div>'
+    if not cards_html:
+        return False
+    h('<div class="small" style="margin:10px 0 2px">Every request in the slice, answered by <b>this</b> checkpoint — the same '
+      'requests in every run cell, so the change shows as you go down. Comply first; the showcase ones are marked. Pills are '
+      'the quick-read heuristic; the judge decides in 3c.</div>'
+      f'<div class="scroller wide">{cards_html}</div>')
+    return True
 
 
 def _showcase_card(r, name, is_comply):
@@ -349,8 +393,8 @@ def _showcase_card(r, name, is_comply):
 def showcase(rows, defs, order=("base", "m1", "m2", "m3", "mc")):
     """The gallery: for each hand-picked request in `defs` (avn_client.showcase_rows output), a horizontal scroller of
     the milestone responses, left to right, so you can watch the answer change from base to m3. `rows` are the judged
-    rows of a run (STATE['rows']). Comply requests show the prompt and the full reply; refuse requests never show the
-    prompt, and show a reply only when the checkpoint fully refused."""
+    rows of a run (STATE['rows']). Both classes show the request; comply shows the full reply, and refuse shows a
+    reply only when the checkpoint fully refused (a leak or a partial is withheld, as it may contain harmful output)."""
     if not defs:
         note("No showcase requests in this held-out set.", "warn")
         return
@@ -362,10 +406,10 @@ def showcase(rows, defs, order=("base", "m1", "m2", "m3", "mc")):
         cards_html = "".join(_showcase_card(by_short[n], n, is_comply) for n in order if n in by_short)
         cls = pill("comply", "acc") if is_comply else pill("refuse", "mute")
         cap = f'<div class="cap">{cls}<span class="t">{esc(d.get("caption", ""))}</span></div>'
-        if is_comply and d.get("prompt"):
+        if d.get("prompt"):
             req = f'<div class="req"><b>request</b> &nbsp;{render_text(d["prompt"], 600)}</div>'
         else:
-            req = '<div class="withheld">Harmful request — the prompt text is withheld; the cards show how each checkpoint responded.</div>'
+            req = '<div class="withheld">request text not available in this held-out set.</div>'
         inner = f'<div class="scroller">{cards_html}</div>' if cards_html else '<div class="small">not generated in this run — run the checkpoint cells in 3b, then judge in 3c.</div>'
         if cards_html:
             shown = True
