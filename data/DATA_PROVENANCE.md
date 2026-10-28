@@ -8,10 +8,10 @@ their own licenses, plus prompts Averlon wrote itself. What ships here:
 | `data/manifest.jsonl` | one line per prompt (1,000): our id, which output file it belongs to, our labels (`tier`, `target`, `stock`, `expected`), the upstream source and row (`locator`), and the SHA-256 of the prompt text. No prompt text. |
 | `data/averlon/own_osp.jsonl` | the 211 prompts Averlon authored, in full |
 | `data/build_data.py` | downloads each upstream file at a pinned revision, takes the rows the manifest names, checks each against its hash, writes the three files below. Nothing downloaded is executed. |
-| `data/CHECKSUMS` | SHA-256 of the three built files: a rebuild is known to be exactly the set our runs used |
+| `data/CHECKSUMS` | SHA-256 of the three built files and of `policy.md`: a rebuild is known to be exactly the set our runs used, labelled under exactly that policy text |
 | `data/policy.md` | the policy the labels follow |
 
-`python data/build_data.py` (or `bash data/fetch_data.sh`) writes `data/train_policy.jsonl` (530 prompts) and the
+`python data/build_data.py` writes `data/train_policy.jsonl` (530 prompts) and the
 held-out `data/eval/policy_unblock.jsonl` (221) and `data/eval/policy_block.jsonl` (249): 1,000 prompts, 500 *refuse* /
 500 *comply*. Downloads are cached under `data/upstream/` (gitignored).
 

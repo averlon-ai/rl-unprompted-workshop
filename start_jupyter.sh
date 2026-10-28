@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Install what the notebook needs and open it in JupyterLab, from a fresh checkout.
+# Set up everything the notebook needs and start JupyterLab, from a fresh checkout.
 #
-#   bash run_notebook.sh                 # venv, dependencies, dataset, then JupyterLab on notebooks/livetest.ipynb
-#   bash run_notebook.sh --setup-only    # everything except launching (for coding agents and CI)
-#   bash run_notebook.sh --port 8890     # any other argument goes to `jupyter lab`
+#   bash start_jupyter.sh                 # venv, dependencies, kernel, dataset, then start JupyterLab (notebook open)
+#   bash start_jupyter.sh --setup-only    # the setup only, without starting JupyterLab (for coding agents and CI)
+#   bash start_jupyter.sh --port 8890     # any other argument goes to `jupyter lab`
 #
 # On a remote machine add --no-browser and open the printed URL through an SSH tunnel
 # (ssh -L 8888:localhost:8888 <host>). The endpoint key can be entered in the notebook's first cell, or beforehand
@@ -36,7 +36,7 @@ if [ ! -f .env ]; then
 fi
 
 if [ "$SETUP_ONLY" = "1" ]; then
-  echo "setup complete: .venv ready, dataset built. Launch with:  .venv/bin/jupyter lab notebooks/livetest.ipynb"
+  echo "setup complete: .venv ready, dataset built. Start JupyterLab with:  .venv/bin/jupyter lab notebooks/livetest.ipynb"
   exit 0
 fi
 exec .venv/bin/jupyter lab notebooks/livetest.ipynb ${ARGS[@]+"${ARGS[@]}"}

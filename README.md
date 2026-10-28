@@ -1,8 +1,32 @@
 # Security-policy RL — live checkpoint test
 
 Five checkpoints of a Gemma-4-26B-A4B-it run that learned a security policy with RL — which requests to **comply**
-with (answer in full) and which to **refuse** — are served on one endpoint. This repository puts the held-out
-validation set through them, in two stages, and shows what changed:
+with (answer in full) and which to **refuse** — are served on one endpoint. This repository tests them on a held-out
+set and shows what changed.
+
+## At a glance
+
+| | |
+|---|---|
+| **Start here** | `bash save_key.sh`, then `bash start_jupyter.sh` — sets up everything and opens the notebook in JupyterLab |
+| Command-line alternative | `bash quickstart.sh` — the same setup, then both stages; result in `results/<UTC>/report.md` |
+| Cynos console | [app.cynos.averlon.ai](https://app.cynos.averlon.ai) — Averlon's Cyber Inference Platform; create your API key here |
+| API key | starts with `sk-cy-`; kept in `.env` as `CYNOS_API_KEY`, never printed |
+| API endpoint | `https://api.cynos.averlon.ai/v1` (override: `AVN_BASE_URL`) |
+| Judge model | `deepseek/deepseek-v4.1-flash-1017` (`AVN_JUDGE_MODEL`; the default in `.env.example`) |
+| You need | Python 3.10+, and network access once to build the dataset |
+| Checkpoints | `avn_rl_base` · `avn_rl_m1` · `avn_rl_m2` · `avn_rl_m3` · `avn_rl_mc` |
+| Milestone rounds | base r0 · m1 r10 · m2 r25 · m3 r80 · mc live (moves while you test) |
+| Expected macro F1 | base 55.9 · m1 71.4 · m2 86.1 · m3 89.4 · mc has none |
+| Classes | **comply** (answer in full) and **refuse** |
+| Held-out set | 221 comply + 249 refuse requests, rebuilt from their upstream sources (not shipped) |
+| Generation settings | temperature 1.0, top_p 0.95, top_k 64, thinking off, no system prompt |
+| Results | `results/<UTC>/` — `report.md`, `metrics.json`, `labels.jsonl`, `plots/` |
+| Guide · coding agents | [`docs/GUIDE.pdf`](docs/GUIDE.pdf) · [`AGENTS.md`](AGENTS.md) |
+
+## How it works
+
+The held-out validation set goes through the checkpoints in two stages:
 
 1. **Generate** — every prompt goes to each checkpoint and the responses are saved (`generate.py`).
 2. **Judge** — a judge LLM on the same endpoint labels each response *answered / soft refusal / refused* with the
@@ -14,13 +38,10 @@ gallery, the guide, and the expected numbers per milestone.
 
 ## Run it
 
-You need an API key for the endpoint (create one in your cynos account; it starts with `sk-cy-`) and the name of the
-judge model served there. Beyond that: Python 3.10+ and network access once, to build the dataset.
-
 | I want to… | run |
 |---|---|
-| get a scored result from a fresh checkout | `bash save_key.sh` then `bash quickstart.sh` |
-| open the notebook in JupyterLab | `bash run_notebook.sh` (`--setup-only` prepares without launching) |
+| **start here:** set up everything and open the notebook | `bash save_key.sh` then `bash start_jupyter.sh` (`--setup-only` does the setup without starting JupyterLab) |
+| get a scored result on the command line instead | `bash quickstart.sh` |
 | only check the endpoint | `python run_tests.py --check` |
 | run the stages by hand | `python generate.py --per-class 50` then `python judge.py` |
 | hand the repo to a coding agent | point it at [`AGENTS.md`](AGENTS.md); Claude Code also gets the `livetest` skill |
@@ -38,11 +59,11 @@ kept out of git.
 
 `notebooks/livetest.ipynb` is the whole flow in one place, styled like the workshop slides: setup and key, the
 milestones as cards with their expected numbers, a connectivity table, plain run cells (the slice, one cell per
-milestone with a live progress bar and a summary, judge), a **gallery** that follows four hand-picked requests — two
+milestone with a live progress bar, the counts and **that checkpoint's reply to every request in the slice** (the showcase ones marked) — the
+same requests in every cell, so the change shows cell by cell before anything is judged; then judge), a **gallery** that follows four hand-picked requests — two
 comply, two refuse, each one the stock model gets wrong — across the milestones in a sideways scroller, and the
-results: a scorecard (measured next to expected), charts with hover (the F1s, precision and recall by class, the
-judge's label mix), a prompt-by-checkpoint label map showing which requests each milestone flipped, a trend across
-runs, the judged rows as cards, try-your-own-prompt on every checkpoint side by side, and re-judge.
+results: a scorecard (measured next to expected) and an F1 chart with hover (macro F1 and the two class F1s), the
+judged rows as cards, try-your-own-prompt on every checkpoint side by side, and re-judge.
 
 The notebook is generated: change `notebooks/build_notebook.py` (and `notebooks/nbtheme.py` for the look), then run
 `python notebooks/build_notebook.py notebooks/livetest.ipynb`. It is committed without outputs, so on GitHub only the
@@ -111,8 +132,9 @@ rows the manifest names, verifies each by hash, and writes the set — byte-iden
 missing, so nothing has to be fetched by hand. Sources and licenses: [`data/DATA_PROVENANCE.md`](data/DATA_PROVENANCE.md).
 The policy the labels follow: [`data/policy.md`](data/policy.md). Evaluation use only.
 
-The refuse-class prompts are harmful by design. Nothing in this repository prints them: the notebook shows a
-refuse-class request's reply only when the checkpoint fully refused, and never the request itself.
+The refuse-class prompts are attack-technique requests. The notebook shows the request text; what it withholds is a
+refuse-class *reply* that is not a full refusal — a leak may contain harmful model output — showing it only once a
+checkpoint fully refuses. `results/` (which stores the raw replies) is kept out of git.
 
 ## Layout
 
@@ -125,7 +147,7 @@ refuse-class request's reply only when the checkpoint fully refused, and never t
 | `data/` | manifest, Averlon-authored prompts, the builder, provenance, the policy |
 | `checkpoints.json` | the five milestones: served name, round, epoch, expected rates |
 | `docs/GUIDE.pdf` | the guide |
-| `quickstart.sh` · `run_notebook.sh` · `save_key.sh` | the entry points |
+| `quickstart.sh` · `start_jupyter.sh` · `save_key.sh` | the entry points |
 | `AGENTS.md` · `CLAUDE.md` · `.claude/skills/livetest/` | the operating manual for coding agents |
 
 License: Apache-2.0 (`LICENSE`).

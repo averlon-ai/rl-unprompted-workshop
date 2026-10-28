@@ -7,12 +7,12 @@ Read `AGENTS.md` at the repository root and follow it. The essentials:
 
 - **Credentials come from the user**: `bash save_key.sh` asks for the cynos API key and the judge model and writes
   `.env`. Never guess, print, log or commit the key.
-- **Run**: `bash quickstart.sh` (everything, to `results/<UTC>/report.md`) · `bash run_notebook.sh` (JupyterLab on
-  the notebook; `--setup-only` to prepare) · `python run_tests.py --check` (connectivity only).
+- **Run**: `bash quickstart.sh` (everything, to `results/<UTC>/report.md`) · `bash start_jupyter.sh` (set up, then
+  start JupyterLab; `--setup-only` for the setup alone) · `python run_tests.py --check` (connectivity only).
 - **Data builds itself** from upstream (`data/build_data.py`) and must match `data/CHECKSUMS`. Never commit
   `data/eval/`, `data/upstream/`, `data/train_policy.jsonl` or `results/`.
-- **Never print a refuse-class prompt, or a refuse-class reply that is not a full refusal** — those prompts are harmful
-  by design; the renderers in `notebooks/nbtheme.py` withhold them.
+- **Withhold a refuse-class reply that is not a full refusal** — a leak may contain harmful model output; the notebook
+  shows the request text, and a refuse reply only once a checkpoint fully refuses (`notebooks/nbtheme.py`).
 - **The notebook is generated**: edit `notebooks/build_notebook.py`, run
   `python notebooks/build_notebook.py notebooks/livetest.ipynb`, commit it without outputs.
 - **Vocabulary**: classes are `comply` / `refuse`; milestones are `base`, `m1`, `m2`, `m3`, `mc`, defined with their
