@@ -8,8 +8,9 @@ report.md / metrics.json, so no value is reachable only by colour):
   trend.png   macro F1 across the runs under results/, when there are at least two
 make_plots() writes them; report_section() is the markdown that embeds them.
 
-For the notebook: scorecard_html, a compact HTML table of this run's precision, recall and F1 per checkpoint next to
-the expected numbers, and plotly_f1 (hover and zoom).
+For the notebook: scorecard_html, a compact HTML table of this run's precision, recall and F1 per checkpoint (next to
+the expected numbers only when given them -- the notebook does so only for a random or full sample), and plotly_f1
+(hover and zoom), its bars shaded light to dark by milestone.
 
 Palette: one accent (the brand violet) against a de-emphasis grey, and a single-hue ordinal ramp for the label
 mix - forms whose separation rests on lightness, with a legend and selective direct labels, so they stay readable
@@ -29,6 +30,10 @@ CONTEXT = "#BDBAC9"                        # the reference / de-emphasis grey
 INK, INK2, GRID, SURFACE = "#1D1B33", "#55536E", "#E4E2EA", "#FCFCFB"
 ORDER = ["base", "m1", "m2", "m3", "mc"]
 MODEL_RAMP = {"base": "#B9B6CC", "m1": "#C8A8EC", "m2": ACCENT_MID, "m3": ACCENT, "mc": "#3F1A74"}   # training order, light -> dark
+# the notebook's F1 bars: one violet, light -> dark in training order, even ~11-point OKLab lightness steps; lighter than
+# MODEL_RAMP, which draws the report's trend LINES (a line this light would vanish on the white background)
+BAR_RAMP = {"base": "#E6DAF5", "m1": "#CBB2EC", "m2": "#AD86E1", "m3": "#8E5AD6", "mc": "#6C2FB8"}
+BAR_EDGE = "#7A5FB0"                       # bar outline: keeps the lightest bars visible on the light chart background
 LABELS = [("full_compliance", "answered", ACCENT_PALE), ("partial_refusal", "soft refusal", ACCENT_MID),
           ("full_refusal", "refused", ACCENT)]
 NAN = float("nan")
@@ -273,20 +278,19 @@ def _titles(fig):
     return fig
 
 
-def plotly_f1(metrics, ref):
-    import plotly.graph_objects as go
+def plotly_f1(metrics):
+    """This run's macro F1 and the two class F1s, one bar per checkpoint, shaded light to dark in training order
+    (BAR_RAMP: base lightest, m3 the darkest frozen milestone, mc the live run darker still). This run's numbers only:
+    no reference bars, since the notebook's curated slice is not comparable to the expected full-set numbers."""
     from plotly.subplots import make_subplots
     models = _models(metrics)
-    has_ref = any(ref.get(m) for m in models)
     fig = make_subplots(rows=1, cols=3, subplot_titles=("macro F1 (the headline)", "comply F1 (answer when it should)",
                                                        "refuse F1 (refuse when it should)"))
+    marker = dict(color=[BAR_RAMP.get(m, CONTEXT) for m in models], line=dict(color=BAR_EDGE, width=1))
     for col, key in enumerate(("macro_F1", "comply_F1", "refuse_F1"), start=1):
-        fig.add_bar(x=models, y=[_m(metrics[m], key) for m in models], name="this test", marker_color=ACCENT,
-                    showlegend=(col == 1 and has_ref), row=1, col=col, hovertemplate="%{x}: %{y:.1f}<extra>this test</extra>")
-        if has_ref:
-            fig.add_bar(x=models, y=[ref.get(m, {}).get(key) for m in models], name="reference", marker_color=CONTEXT,
-                        showlegend=(col == 1), row=1, col=col, hovertemplate="%{x}: %{y:.1f}<extra>reference</extra>")
-    fig.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08, height=360, **_PLOTLY_LAYOUT)
+        fig.add_bar(x=models, y=[_m(metrics[m], key) for m in models], marker=marker, showlegend=False, row=1, col=col,
+                    hovertemplate="%{x}: %{y:.1f}<extra></extra>")
+    fig.update_layout(bargap=0.3, barcornerradius=4, height=360, **_PLOTLY_LAYOUT)
     fig.update_yaxes(range=[0, 100], gridcolor=GRID)
     return _titles(fig)
 
@@ -319,10 +323,10 @@ def scorecard_html(metrics, ref):
                  f"{cell(v.get('refuse_P'), r.get('refuse_P'), False)}{cell(v.get('refuse_R'), r.get('refuse_R'), False)}{cell(v.get('refuse_F1'), r.get('refuse_F1'), False)}"
                  f"<td class='num'>{_m(v, 'n_comply') or v.get('n_unblock', 0)} + {v.get('n_refuse', 0)}</td></tr>")
     note = ("" if not any(ref.get(m) for m in models) else
-            " Each number is this test <b>vs</b> the milestone's expected (reference) number, green = at least as good, red = worse.")
+            " Each number is this test <b>vs</b> the milestone's expected (reference) number, green = at least as good, red = worse."
+            " The reference is the frozen held-out number in <span class='mono'>checkpoints.json</span>; mc (the live run) has none.")
     return (f"<div class='avn'><table class='grid'>{head}{body}</table><p class='small' style='margin:6px 0 0'>"
             "Precision, recall and F1 per class, with <b>macro F1</b> the headline (the mean of the two class F1s). "
             "Comply is the should-answer class, refuse the should-refuse class. "
-            f"These are this run's measured numbers.{note} The reference is the frozen held-out number in "
-            "<span class='mono'>checkpoints.json</span>; mc (the live run) has none. A small sample is noisy — read the "
+            f"These are this run's measured numbers.{note} A small sample is noisy — read the "
             "direction across checkpoints before any one figure.</p></div>")

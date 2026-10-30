@@ -50,7 +50,7 @@ refuse), with **macro F1** the headline.
    The notebook, top to bottom: setup and key → the milestones with their expected numbers → connectivity → 3a the
    slice → 3b one run cell per checkpoint, each showing that checkpoint's reply to every request in the slice
    (comply with full text; refuse withheld until judged; the showcase ones marked) → 3c judge → 3d load the run → 3e the gallery across the
-   milestones → 4 results (scorecard measured vs expected, the F1 chart) → browse, try your own prompt,
+   milestones → 4 results (scorecard and F1 chart; set against the expected numbers only for a random or full sample, never the curated slice) → browse, try your own prompt,
    re-judge.
 
 ## Reading results
@@ -62,7 +62,8 @@ refuse), with **macro F1** the headline.
 - The expected numbers for each frozen milestone are in `checkpoints.json` (`over_refusal`, `block_leak` per
   checkpoint; `avn_client.reference()` derives the P / R / F1). `mc` is the live run and has none.
 - One draw at temperature 1.0 is noisy: read the direction `base` → `m3`, not single figures. The notebook's slice is
-  chosen from requests the stock model gets wrong, so `base` scores near zero on it by construction.
+  chosen from requests the stock model gets wrong, so `base` scores near zero on it by construction, and it is far too small to compare with the expected numbers.
+  For that, run `python run_tests.py --all` (or a random `--per-class N`); `generate.json` records how a run was sampled.
 
 ## Rules
 
