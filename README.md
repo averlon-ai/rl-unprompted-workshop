@@ -139,6 +139,13 @@ The refuse-class prompts are attack-technique requests. The notebook shows the r
 refuse-class *reply* that is not a full refusal — a leak may contain harmful model output — showing it only once a
 checkpoint fully refuses. `results/` (which stores the raw replies) is kept out of git.
 
+## Rebuild the training
+
+This repository tests the trained checkpoints. To build the training pipeline yourself, `rl-package/` describes the
+system without training code: the design, the settings, the libraries and versions, the judge and ISR judge prompts,
+the target numbers and the checks for each step, plus skill files for a coding agent. Start at
+`rl-package/README.md`.
+
 ## Layout
 
 | | |
@@ -152,5 +159,6 @@ checkpoint fully refuses. `results/` (which stores the raw replies) is kept out 
 | `docs/GUIDE.pdf` | the guide |
 | `quickstart.sh` · `start_jupyter.sh` · `save_key.sh` | the entry points |
 | `AGENTS.md` · `CLAUDE.md` · `.claude/skills/livetest/` | the operating manual for coding agents |
+| `rl-package/` | design package for rebuilding the RL training yourself (no code; start at `rl-package/README.md`) |
 
 License: Apache-2.0 (`LICENSE`).
