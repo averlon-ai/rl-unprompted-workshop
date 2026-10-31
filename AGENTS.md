@@ -94,4 +94,5 @@ refuse), with **macro F1** the headline.
 | `data/` | `manifest.jsonl`, `averlon/own_osp.jsonl`, `build_data.py`, `CHECKSUMS`, `DATA_PROVENANCE.md`, `policy.md` |
 | `checkpoints.json` | the five milestones: served name, round, epoch, expected rates |
 | `docs/GUIDE.pdf` | the guide |
+| `rl-package/` | design package for rebuilding the training yourself (no training code); start at `rl-package/README.md` |
 | `quickstart.sh` · `start_jupyter.sh` · `save_key.sh` | the three entry points |
